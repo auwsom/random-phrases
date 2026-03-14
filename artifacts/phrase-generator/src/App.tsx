@@ -4,7 +4,7 @@ import { NOUNS, VERBS, ADJECTIVES, ADVERBS, PREPOSITIONS, DETERMINERS } from "./
 const API_KEY = "f59c1c83-f0d9-437b-8e8a-6ecd94fa7e3f";
 
 type SlotType = "noun" | "verb" | "adj" | "adv" | "prep" | "det";
-type Token = SlotType | string; // string = literal word (e.g. "of", "while")
+type Token = SlotType | string;
 
 interface Template {
   name: string;
@@ -136,6 +136,28 @@ function downloadFile(lines: string[]) {
   URL.revokeObjectURL(url);
 }
 
+async function createGist(phrases: string[]): Promise<string> {
+  const res = await fetch("https://api.github.com/gists", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/vnd.github+json",
+    },
+    body: JSON.stringify({
+      description: "Random Phrase Generator — saved phrases",
+      public: true,
+      files: {
+        "phrases.txt": {
+          content: phrases.join("\n"),
+        },
+      },
+    }),
+  });
+  if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
+  const data = await res.json();
+  return data.html_url;
+}
+
 const LABEL_COLOR: Record<string, string> = {
   det: "#7c6cfc",
   adj: "#3b9eff",
@@ -153,18 +175,21 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState<string[]>([]);
   const [lockedTemplate, setLockedTemplate] = useState<number | null>(null);
+  const [colorize, setColorize] = useState(false);
+  const [gistUrl, setGistUrl] = useState<string | null>(null);
+  const [gistLoading, setGistLoading] = useState(false);
+  const [gistError, setGistError] = useState<string | null>(null);
+  const [gistCopied, setGistCopied] = useState(false);
 
   async function generate() {
     setLoading(true);
     setCopied(false);
     try {
-      // Need 1 int for template selection + up to 9 for slots = 10 total
       const ints = await getRandomInts(10, 9999);
       const tIdx = lockedTemplate !== null ? lockedTemplate : ints[0] % TEMPLATES.length;
       const tpl = TEMPLATES[tIdx];
-      const slotInts = ints.slice(1);
-      const words = buildPhrase(tpl, slotInts);
-      setPhrase(words.split(" ").map((_, i) => words.split(" ")[i]));
+      const words = buildPhrase(tpl, ints.slice(1));
+      setPhrase(words.split(" "));
       setTemplate(tpl);
       setSource("random.org");
     } catch {
@@ -200,23 +225,41 @@ export default function App() {
     setSaved((s) => s.filter((_, idx) => idx !== i));
   }
 
-  // Build colored token display
-  function renderColoredPhrase() {
+  async function saveToGist() {
+    if (saved.length === 0) return;
+    setGistLoading(true);
+    setGistError(null);
+    setGistUrl(null);
+    try {
+      const url = await createGist(saved);
+      setGistUrl(url);
+    } catch (e) {
+      setGistError(e instanceof Error ? e.message : "Failed to create gist");
+    } finally {
+      setGistLoading(false);
+    }
+  }
+
+  function copyGistUrl() {
+    if (gistUrl) {
+      navigator.clipboard.writeText(gistUrl);
+      setGistCopied(true);
+      setTimeout(() => setGistCopied(false), 1500);
+    }
+  }
+
+  function renderPhrase() {
     if (!template || phrase.length === 0) return null;
+    if (!colorize) {
+      return <span style={{ color: "#f1f5f9" }}>{phraseStr}</span>;
+    }
     const result: React.ReactNode[] = [];
     let wordIdx = 0;
     template.tokens.forEach((token, ti) => {
       const word = phrase[wordIdx];
       wordIdx++;
-      if (!isSlotType(token)) {
-        result.push(
-          <span key={ti} style={{ color: "#94a3b8" }}>{word} </span>
-        );
-      } else {
-        result.push(
-          <span key={ti} style={{ color: LABEL_COLOR[token] ?? "#e2e8f0" }}>{word} </span>
-        );
-      }
+      const color = isSlotType(token) ? (LABEL_COLOR[token] ?? "#e2e8f0") : "#94a3b8";
+      result.push(<span key={ti} style={{ color }}>{word} </span>);
     });
     return result;
   }
@@ -240,7 +283,6 @@ export default function App() {
           Grammatically structured phrases · true randomness via random.org
         </p>
 
-        {/* Template picker */}
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 12, color: "#475569", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.07em" }}>
             Pattern
@@ -266,23 +308,39 @@ export default function App() {
           </select>
         </div>
 
-        <button
-          onClick={generate}
-          disabled={loading}
-          style={{
-            padding: "9px 28px",
-            background: loading ? "#1e3a8a" : "#2563eb",
-            color: "#fff",
-            border: "none",
-            borderRadius: 6,
-            fontSize: 14,
-            fontWeight: 500,
-            cursor: loading ? "wait" : "pointer",
-            marginBottom: 24,
-          }}
-        >
-          {loading ? "Generating…" : "Generate"}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+          <button
+            onClick={generate}
+            disabled={loading}
+            style={{
+              padding: "9px 28px",
+              background: loading ? "#1e3a8a" : "#2563eb",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: loading ? "wait" : "pointer",
+            }}
+          >
+            {loading ? "Generating…" : "Generate"}
+          </button>
+
+          <button
+            onClick={() => setColorize((c) => !c)}
+            style={{
+              padding: "7px 14px",
+              background: colorize ? "#1e2330" : "#1e2330",
+              color: colorize ? "#4ade80" : "#475569",
+              border: `1px solid ${colorize ? "#2d4a3e" : "#2d3548"}`,
+              borderRadius: 6,
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            Colors {colorize ? "on" : "off"}
+          </button>
+        </div>
 
         {phraseStr && (
           <div style={{
@@ -292,13 +350,11 @@ export default function App() {
             padding: "20px 22px",
             marginBottom: 24,
           }}>
-            {/* Colored phrase */}
             <div style={{ fontSize: 20, fontWeight: 600, lineHeight: 1.6, marginBottom: 12, wordBreak: "break-word" }}>
-              {renderColoredPhrase()}
+              {renderPhrase()}
             </div>
 
-            {/* Template name */}
-            {template && (
+            {colorize && template && (
               <div style={{ fontSize: 11, color: "#475569", marginBottom: 14, fontFamily: "monospace" }}>
                 {template.tokens.map((t, i) => (
                   <span key={i}>
@@ -325,29 +381,57 @@ export default function App() {
           </div>
         )}
 
-        {/* Color legend */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 28 }}>
-          {Object.entries(LABEL_COLOR).map(([type, color]) => (
-            <span key={type} style={{ fontSize: 11, color, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-              ● {type}
+        {colorize && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 28 }}>
+            {Object.entries(LABEL_COLOR).map(([type, color]) => (
+              <span key={type} style={{ fontSize: 11, color, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                ● {type}
+              </span>
+            ))}
+            <span style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              ● literal
             </span>
-          ))}
-          <span style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            ● literal
-          </span>
-        </div>
+          </div>
+        )}
 
-        {/* Saved */}
         {saved.length > 0 && (
           <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
               <p style={{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
                 Saved ({saved.length})
               </p>
-              <button onClick={() => downloadFile(saved)} style={btn("#1e2330", "#60a5fa", "#2d3548")}>
-                Download .txt
-              </button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => downloadFile(saved)} style={btn("#1e2330", "#60a5fa", "#2d3548")}>
+                  Download .txt
+                </button>
+                <button
+                  onClick={saveToGist}
+                  disabled={gistLoading}
+                  style={btn(gistLoading ? "#1e2330" : "#1e2330", gistLoading ? "#475569" : "#a78bfa", "#2d3548")}
+                >
+                  {gistLoading ? "Saving…" : "Save to Gist"}
+                </button>
+              </div>
             </div>
+
+            {gistUrl && (
+              <div style={{ background: "#162320", border: "1px solid #2d4a3e", borderRadius: 6, padding: "10px 14px", marginBottom: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12, color: "#4ade80" }}>✓ Saved!</span>
+                <a href={gistUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "#60a5fa", wordBreak: "break-all" }}>
+                  {gistUrl}
+                </a>
+                <button onClick={copyGistUrl} style={btn("#1e2330", gistCopied ? "#86efac" : "#94a3b8", "#2d3548")}>
+                  {gistCopied ? "Copied!" : "Copy URL"}
+                </button>
+              </div>
+            )}
+
+            {gistError && (
+              <div style={{ background: "#2a1515", border: "1px solid #4a2d2d", borderRadius: 6, padding: "8px 14px", marginBottom: 12 }}>
+                <span style={{ fontSize: 12, color: "#f87171" }}>Gist error: {gistError}</span>
+              </div>
+            )}
+
             {saved.map((p, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid #1e2330", gap: 12 }}>
                 <span style={{ fontSize: 13, color: "#94a3b8", flex: 1 }}>{p}</span>
