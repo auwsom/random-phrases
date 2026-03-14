@@ -91,6 +91,19 @@ Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used b
 
 Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
 
+### `artifacts/phrase-generator` (`@workspace/phrase-generator`)
+
+Dark-mode random phrase generator using random.org true randomness API. Features POS-tagged word categories (nouns, verbs, adjectives, adverbs, prepositions, determiners), 12 grammatical templates, color-coding toggle for parts of speech, save/download/gist functionality, and browser crypto fallback.
+
+- Entry: `src/main.tsx` → `src/App.tsx`
+- Word list: `src/words.ts` (bundled EFF diceware list, ~7,776 words split by POS)
+- API key: `f59c1c83-f0d9-437b-8e8a-6ecd94fa7e3f` (random.org JSON-RPC v2)
+- Runs at `/` (root path)
+
+### `artifacts/phrase-generator-v2` (`@workspace/phrase-generator-v2`)
+
+Independent clone of `phrase-generator` for separate modification. Identical source code (App.tsx, words.ts, index.css). Runs at `/phrase-generator-v2/`.
+
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
