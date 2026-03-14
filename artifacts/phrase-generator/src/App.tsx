@@ -230,11 +230,15 @@ export default function App() {
     setGistLoading(true);
     setGistError(null);
     setGistUrl(null);
+    setGistCopied(false);
     try {
       const url = await createGist(saved);
       setGistUrl(url);
     } catch (e) {
-      setGistError(e instanceof Error ? e.message : "Failed to create gist");
+      const msg = e instanceof Error && e.message.includes("403")
+        ? "Rate limited — try again in a minute"
+        : "Couldn't save gist, try again";
+      setGistError(msg);
     } finally {
       setGistLoading(false);
     }
