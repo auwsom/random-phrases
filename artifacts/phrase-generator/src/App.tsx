@@ -11,17 +11,16 @@ const WORDS = [
   "rapid","raven","red","restless","rising","roaming","rough","royal","rugged","sacred",
   "scarlet","serene","sharp","silent","silver","sleek","slow","smoky","solar","solemn",
   "sonic","stark","still","storm","swift","thorned","tidal","timeless","twilight","vast",
-  "velvet","wandering","wild","winter","wolf","ancient","broken","burning","carved","chasing",
-  "drifting","fallen","fleeting","forged","haunting","iron","lost","rising","rusted","silent",
-  "stone","thunder","woven","arrow","atlas","beacon","blade","bridge","canyon","castle",
-  "cavern","comet","compass","crater","creek","crown","dagger","delta","desert","domain",
-  "drift","dusk","echo","falcon","flame","forest","gate","glacier","grove","harbor","hawk",
-  "horizon","isle","keep","lake","lantern","legend","marsh","mesa","mine","mirror","moon",
-  "mountain","nexus","oasis","orbit","passage","peak","pine","plain","prism","quarry",
-  "quest","rain","range","reef","ridge","river","rune","saga","salt","sand","sea","shadow",
-  "shore","signal","sky","spark","spire","spring","star","storm","summit","sun","surge",
-  "swamp","sword","temple","tide","timber","torch","tower","trail","tundra","valley","vault",
-  "veil","village","void","wave","well","wind","wood","world","zenith","zone"
+  "velvet","wandering","wild","winter","wolf","broken","burning","carved","chasing",
+  "fallen","fleeting","forged","haunting","lost","rusted","thunder","woven","arrow","atlas",
+  "beacon","blade","bridge","canyon","castle","cavern","comet","compass","crater","creek",
+  "crown","dagger","delta","desert","domain","drift","dusk","echo","falcon","flame","forest",
+  "gate","glacier","grove","harbor","hawk","horizon","isle","keep","lake","lantern","legend",
+  "marsh","mesa","mine","mirror","moon","mountain","nexus","oasis","orbit","passage","peak",
+  "pine","plain","prism","quarry","quest","rain","range","reef","ridge","river","rune","saga",
+  "salt","sand","sea","shadow","shore","signal","sky","spark","spire","spring","star","summit",
+  "sun","surge","swamp","sword","temple","tide","timber","torch","tower","trail","tundra",
+  "valley","vault","veil","village","void","wave","well","wind","wood","world","zenith","zone"
 ];
 
 async function fetchRandomIndices(count: number, max: number): Promise<number[]> {
@@ -52,10 +51,12 @@ export default function App() {
   const [phrase, setPhrase] = useState("");
   const [source, setSource] = useState<"random.org" | "browser" | null>(null);
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
 
   async function generate() {
     setLoading(true);
+    setCopied(false);
     try {
       const indices = await fetchRandomIndices(wordCount, WORDS.length);
       const result = indices.map((i) => WORDS[i]).join(" ");
@@ -74,80 +75,128 @@ export default function App() {
   }
 
   function copy() {
-    if (phrase) navigator.clipboard.writeText(phrase);
+    if (phrase) {
+      navigator.clipboard.writeText(phrase);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
   }
 
   return (
-    <div style={{ fontFamily: "system-ui, sans-serif", maxWidth: 540, margin: "60px auto", padding: "0 20px" }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>Random Phrase Generator</h1>
-      <p style={{ color: "#666", marginBottom: 28, fontSize: 14 }}>
-        Uses true randomness from random.org (atmospheric noise).
-      </p>
+    <div style={{
+      minHeight: "100vh",
+      background: "#0f1117",
+      color: "#e2e8f0",
+      fontFamily: "system-ui, sans-serif",
+      display: "flex",
+      alignItems: "flex-start",
+      justifyContent: "center",
+      padding: "60px 20px",
+    }}>
+      <div style={{ width: "100%", maxWidth: 520 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4, color: "#f8fafc" }}>
+          Random Phrase Generator
+        </h1>
+        <p style={{ color: "#64748b", marginBottom: 32, fontSize: 13 }}>
+          True randomness via random.org atmospheric noise.
+        </p>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-        <label style={{ fontSize: 14, color: "#444" }}>Words:</label>
-        <input
-          type="number"
-          min={1}
-          max={10}
-          value={wordCount}
-          onChange={(e) => setWordCount(Math.max(1, Math.min(10, Number(e.target.value))))}
-          style={{ width: 60, padding: "6px 8px", border: "1px solid #ccc", borderRadius: 6, fontSize: 14 }}
-        />
-        <button
-          onClick={generate}
-          disabled={loading}
-          style={{
-            padding: "8px 20px",
-            background: "#2563eb",
-            color: "#fff",
-            border: "none",
-            borderRadius: 6,
-            fontSize: 14,
-            cursor: loading ? "wait" : "pointer",
-            opacity: loading ? 0.7 : 1,
-          }}
-        >
-          {loading ? "Generating…" : "Generate"}
-        </button>
-      </div>
-
-      {phrase && (
-        <div style={{ background: "#f1f5f9", borderRadius: 8, padding: "20px 24px", marginBottom: 8 }}>
-          <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: "0.01em", marginBottom: 10 }}>
-            {phrase}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <button
-              onClick={copy}
-              style={{
-                fontSize: 13,
-                padding: "4px 12px",
-                background: "#fff",
-                border: "1px solid #cbd5e1",
-                borderRadius: 5,
-                cursor: "pointer",
-              }}
-            >
-              Copy
-            </button>
-            <span style={{ fontSize: 12, color: source === "random.org" ? "#16a34a" : "#d97706" }}>
-              {source === "random.org" ? "✓ random.org" : "⚠ browser fallback"}
-            </span>
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
+          <label style={{ fontSize: 13, color: "#94a3b8" }}>Words:</label>
+          <input
+            type="number"
+            min={1}
+            max={10}
+            value={wordCount}
+            onChange={(e) => setWordCount(Math.max(1, Math.min(10, Number(e.target.value))))}
+            style={{
+              width: 56,
+              padding: "7px 10px",
+              background: "#1e2330",
+              border: "1px solid #2d3548",
+              borderRadius: 6,
+              color: "#e2e8f0",
+              fontSize: 14,
+              outline: "none",
+            }}
+          />
+          <button
+            onClick={generate}
+            disabled={loading}
+            style={{
+              padding: "8px 22px",
+              background: loading ? "#1e3a8a" : "#2563eb",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: loading ? "wait" : "pointer",
+              transition: "background 0.15s",
+            }}
+          >
+            {loading ? "Generating…" : "Generate"}
+          </button>
         </div>
-      )}
 
-      {history.length > 1 && (
-        <div style={{ marginTop: 28 }}>
-          <p style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>Recent phrases</p>
-          {history.slice(1).map((p, i) => (
-            <div key={i} style={{ fontSize: 13, color: "#555", padding: "4px 0", borderBottom: "1px solid #f0f0f0" }}>
-              {p}
+        {phrase && (
+          <div style={{
+            background: "#1a1f2e",
+            border: "1px solid #2d3548",
+            borderRadius: 10,
+            padding: "20px 22px",
+            marginBottom: 8,
+          }}>
+            <div style={{ fontSize: 21, fontWeight: 600, color: "#f1f5f9", letterSpacing: "0.01em", marginBottom: 14, lineHeight: 1.4 }}>
+              {phrase}
             </div>
-          ))}
-        </div>
-      )}
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <button
+                onClick={copy}
+                style={{
+                  fontSize: 12,
+                  padding: "4px 14px",
+                  background: copied ? "#166534" : "#1e2330",
+                  color: copied ? "#86efac" : "#94a3b8",
+                  border: "1px solid " + (copied ? "#166534" : "#2d3548"),
+                  borderRadius: 5,
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
+              >
+                {copied ? "Copied!" : "Copy"}
+              </button>
+              <span style={{ fontSize: 12, color: source === "random.org" ? "#4ade80" : "#fbbf24" }}>
+                {source === "random.org" ? "✓ random.org" : "⚠ browser fallback"}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {history.length > 1 && (
+          <div style={{ marginTop: 32 }}>
+            <p style={{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
+              Recent
+            </p>
+            {history.slice(1).map((p, i) => (
+              <div
+                key={i}
+                style={{
+                  fontSize: 13,
+                  color: "#64748b",
+                  padding: "6px 0",
+                  borderBottom: "1px solid #1e2330",
+                  cursor: "pointer",
+                }}
+                onClick={() => { setPhrase(p); setCopied(false); }}
+                title="Click to restore"
+              >
+                {p}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
