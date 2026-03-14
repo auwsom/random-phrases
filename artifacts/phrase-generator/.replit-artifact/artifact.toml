@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Random Phrase Generator"
+version = "1.0.0"
+id = "artifacts/phrase-generator"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+localPort = 20628
+name = "web"
+paths = ["/"]
+
+[services.development]
+run = "pnpm --filter @workspace/phrase-generator run dev"
+
+[services.env]
+PORT = "20628"
+BASE_PATH = "/"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/phrase-generator", "run", "build"]
+publicDir = "artifacts/phrase-generator/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
