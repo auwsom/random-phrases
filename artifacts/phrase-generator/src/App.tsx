@@ -1,22 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { WORDS } from "./words";
 
 const API_KEY = "f59c1c83-f0d9-437b-8e8a-6ecd94fa7e3f";
-
-async function loadWordList(): Promise<string[]> {
-  try {
-    const res = await fetch(
-      "https://www.eff.org/files/2016/07/18/eff_large_wordlist.txt"
-    );
-    const text = await res.text();
-    return text
-      .trim()
-      .split("\n")
-      .map((line) => line.split("\t")[1]?.trim())
-      .filter(Boolean) as string[];
-  } catch {
-    return [];
-  }
-}
 
 async function fetchRandomIndices(count: number, max: number): Promise<number[]> {
   const body = {
@@ -53,8 +38,6 @@ function downloadFile(lines: string[]) {
 }
 
 export default function App() {
-  const [words, setWords] = useState<string[]>([]);
-  const [wordListStatus, setWordListStatus] = useState<"loading" | "loaded" | "fallback">("loading");
   const [wordCount, setWordCount] = useState(10);
   const [phrase, setPhrase] = useState("");
   const [source, setSource] = useState<"random.org" | "browser" | null>(null);
@@ -62,29 +45,17 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState<string[]>([]);
 
-  useEffect(() => {
-    loadWordList().then((list) => {
-      if (list.length > 0) {
-        setWords(list);
-        setWordListStatus("loaded");
-      } else {
-        setWordListStatus("fallback");
-      }
-    });
-  }, []);
-
   async function generate() {
-    if (words.length === 0) return;
     setLoading(true);
     setCopied(false);
     try {
-      const indices = await fetchRandomIndices(wordCount, words.length);
-      const result = indices.map((i) => words[i]).join(" ");
+      const indices = await fetchRandomIndices(wordCount, WORDS.length);
+      const result = indices.map((i) => WORDS[i]).join(" ");
       setPhrase(result);
       setSource("random.org");
     } catch {
-      const indices = fallbackIndices(wordCount, words.length);
-      const result = indices.map((i) => words[i]).join(" ");
+      const indices = fallbackIndices(wordCount, WORDS.length);
+      const result = indices.map((i) => WORDS[i]).join(" ");
       setPhrase(result);
       setSource("browser");
     } finally {
@@ -110,8 +81,6 @@ export default function App() {
     setSaved((s) => s.filter((_, idx) => idx !== i));
   }
 
-  const isReady = wordListStatus !== "loading";
-
   return (
     <div style={{
       minHeight: "100vh",
@@ -131,9 +100,7 @@ export default function App() {
           True randomness via random.org atmospheric noise.
         </p>
         <p style={{ color: "#475569", marginBottom: 28, fontSize: 12 }}>
-          {wordListStatus === "loading" && "Loading EFF word list (7,776 words)…"}
-          {wordListStatus === "loaded" && `Word list: ${words.length.toLocaleString()} words (EFF large diceware)`}
-          {wordListStatus === "fallback" && "Word list failed to load — refresh to retry"}
+          Word list: {WORDS.length.toLocaleString()} words (EFF large diceware)
         </p>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
@@ -157,19 +124,19 @@ export default function App() {
           />
           <button
             onClick={generate}
-            disabled={loading || !isReady}
+            disabled={loading}
             style={{
               padding: "8px 22px",
-              background: loading || !isReady ? "#1e3a8a" : "#2563eb",
+              background: loading ? "#1e3a8a" : "#2563eb",
               color: "#fff",
               border: "none",
               borderRadius: 6,
               fontSize: 14,
               fontWeight: 500,
-              cursor: loading || !isReady ? "wait" : "pointer",
+              cursor: loading ? "wait" : "pointer",
             }}
           >
-            {wordListStatus === "loading" ? "Loading…" : loading ? "Generating…" : "Generate"}
+            {loading ? "Generating…" : "Generate"}
           </button>
         </div>
 
