@@ -188,12 +188,12 @@ export default function App() {
   const [gistLoading, setGistLoading] = useState(false);
   const [gistError, setGistError] = useState<string | null>(null);
   const [gistCopied, setGistCopied] = useState(false);
-  const envPat = import.meta.env.VITE_GITHUB_PAT as string | undefined;
+  const isDev = import.meta.env.DEV;
   const [pat, setPat] = useState(() => sessionStorage.getItem("gh-pat") ?? "");
 
   useEffect(() => {
-    sessionStorage.setItem("gh-pat", pat);
-  }, [pat]);
+    if (isDev) sessionStorage.setItem("gh-pat", pat);
+  }, [pat, isDev]);
 
   useEffect(() => {
     try {
@@ -245,21 +245,33 @@ export default function App() {
     setSaved((s) => s.filter((_, idx) => idx !== i));
   }
 
-  const activePat = envPat || pat.trim();
-
   async function saveToGist() {
-    if (saved.length === 0 || !activePat) return;
+    if (saved.length === 0) return;
+    if (isDev && !pat.trim()) return;
     setGistLoading(true);
     setGistError(null);
     setGistUrl(null);
     setGistCopied(false);
     try {
-      const url = await createGist(saved, activePat);
+      let url: string;
+      if (isDev) {
+        url = await createGist(saved, pat.trim());
+      } else {
+        const res = await fetch("/.netlify/functions/save-gist", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phrases: saved }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? `Server error: ${res.status}`);
+        url = data.url;
+      }
       setGistUrl(url);
     } catch (e) {
-      const msg = e instanceof Error && e.message.includes("403")
+      const raw = e instanceof Error ? e.message : "";
+      const msg = raw.includes("403") || raw.toLowerCase().includes("rate")
         ? "Rate limited — try again in a minute"
-        : "Couldn't save gist, try again";
+        : raw || "Couldn't save gist, try again";
       setGistError(msg);
     } finally {
       setGistLoading(false);
@@ -432,16 +444,16 @@ export default function App() {
                 </button>
                 <button
                   onClick={saveToGist}
-                  disabled={gistLoading || !activePat}
-                  title={!activePat ? "Enter a GitHub PAT below to save" : undefined}
-                  style={btn(gistLoading ? "#1e2330" : "#1e2330", (gistLoading || !activePat) ? "#475569" : "#a78bfa", "#2d3548")}
+                  disabled={gistLoading || (isDev && !pat.trim())}
+                  title={isDev && !pat.trim() ? "Enter a GitHub PAT below to save" : undefined}
+                  style={btn(gistLoading ? "#1e2330" : "#1e2330", (gistLoading || (isDev && !pat.trim())) ? "#475569" : "#a78bfa", "#2d3548")}
                 >
                   {gistLoading ? "Saving…" : "Save to Gist"}
                 </button>
               </div>
             </div>
 
-            {!envPat && (
+            {isDev && (
               <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
                 <input
                   type="password"

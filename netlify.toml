@@ -1,9 +1,10 @@
 [build]
-  base    = "."
-  command = "pnpm --filter @workspace/phrase-generator run build"
-  publish = "artifacts/phrase-generator/dist/public"
+  base      = "."
+  command   = "pnpm --filter @workspace/phrase-generator run build"
+  publish   = "artifacts/phrase-generator/dist/public"
+  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "20"
   PNPM_VERSION = "9"
-  BASE_PATH     = "/"
+  BASE_PATH    = "/"
