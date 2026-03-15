@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NOUNS, VERBS, ADJECTIVES, ADVERBS, PREPOSITIONS, DETERMINERS } from "./words";
 
 const API_KEY = "f59c1c83-f0d9-437b-8e8a-6ecd94fa7e3f";
@@ -173,13 +173,26 @@ export default function App() {
   const [source, setSource] = useState<"random.org" | "browser" | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [saved, setSaved] = useState<string[]>([]);
+  const [saved, setSaved] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem("phrase-generator:saved");
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
   const [lockedTemplate, setLockedTemplate] = useState<number | null>(null);
   const [colorize, setColorize] = useState(false);
   const [gistUrl, setGistUrl] = useState<string | null>(null);
   const [gistLoading, setGistLoading] = useState(false);
   const [gistError, setGistError] = useState<string | null>(null);
   const [gistCopied, setGistCopied] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("phrase-generator:saved", JSON.stringify(saved));
+    } catch {}
+  }, [saved]);
 
   async function generate() {
     setLoading(true);
