@@ -136,28 +136,6 @@ function downloadFile(lines: string[]) {
   URL.revokeObjectURL(url);
 }
 
-async function createGist(phrases: string[], pat: string): Promise<string> {
-  const res = await fetch("https://api.github.com/gists", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${pat}`,
-    },
-    body: JSON.stringify({
-      description: "Random Phrase Generator — saved phrases",
-      public: true,
-      files: {
-        "phrases.txt": {
-          content: phrases.join("\n"),
-        },
-      },
-    }),
-  });
-  if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
-  const data = await res.json();
-  return data.html_url;
-}
 
 const LABEL_COLOR: Record<string, string> = {
   det: "#7c6cfc",
@@ -184,22 +162,30 @@ export default function App() {
   });
   const [lockedTemplate, setLockedTemplate] = useState<number | null>(null);
   const [colorize, setColorize] = useState(false);
-  const [gistUrl, setGistUrl] = useState<string | null>(null);
-  const [gistLoading, setGistLoading] = useState(false);
-  const [gistError, setGistError] = useState<string | null>(null);
-  const [gistCopied, setGistCopied] = useState(false);
   const isDev = import.meta.env.DEV;
-  const [pat, setPat] = useState(() => sessionStorage.getItem("gh-pat") ?? "");
-
-  useEffect(() => {
-    if (isDev) sessionStorage.setItem("gh-pat", pat);
-  }, [pat, isDev]);
+  const [repoSha, setRepoSha] = useState<string | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<"idle" | "synced" | "error">("idle");
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   useEffect(() => {
     try {
       localStorage.setItem("phrase-generator:saved", JSON.stringify(saved));
     } catch {}
   }, [saved]);
+
+  useEffect(() => {
+    if (isDev) return;
+    fetch("/.netlify/functions/phrases-repo")
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data.phrases) && data.phrases.length > 0) {
+          setSaved(data.phrases);
+        }
+        setRepoSha(data.sha ?? null);
+      })
+      .catch(() => {});
+  }, [isDev]);
 
   async function generate() {
     setLoading(true);
@@ -245,44 +231,27 @@ export default function App() {
     setSaved((s) => s.filter((_, idx) => idx !== i));
   }
 
-  async function saveToGist() {
-    if (saved.length === 0) return;
-    if (isDev && !pat.trim()) return;
-    setGistLoading(true);
-    setGistError(null);
-    setGistUrl(null);
-    setGistCopied(false);
+  async function syncToRepo() {
+    if (isDev || saved.length === 0) return;
+    setSyncLoading(true);
+    setSyncError(null);
     try {
-      let url: string;
-      if (isDev) {
-        url = await createGist(saved, pat.trim());
-      } else {
-        const res = await fetch("/.netlify/functions/save-gist", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phrases: saved }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? `Server error: ${res.status}`);
-        url = data.url;
-      }
-      setGistUrl(url);
+      const res = await fetch("/.netlify/functions/phrases-repo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phrases: saved, sha: repoSha }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `Server error: ${res.status}`);
+      setRepoSha(data.sha);
+      setSyncStatus("synced");
+      setTimeout(() => setSyncStatus("idle"), 3000);
     } catch (e) {
       const raw = e instanceof Error ? e.message : "";
-      const msg = raw.includes("403") || raw.toLowerCase().includes("rate")
-        ? "Rate limited — try again in a minute"
-        : raw || "Couldn't save gist, try again";
-      setGistError(msg);
+      setSyncError(raw || "Sync failed, try again");
+      setSyncStatus("error");
     } finally {
-      setGistLoading(false);
-    }
-  }
-
-  function copyGistUrl() {
-    if (gistUrl) {
-      navigator.clipboard.writeText(gistUrl);
-      setGistCopied(true);
-      setTimeout(() => setGistCopied(false), 1500);
+      setSyncLoading(false);
     }
   }
 
@@ -438,63 +407,25 @@ export default function App() {
               <p style={{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
                 Saved ({saved.length})
               </p>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <button onClick={() => downloadFile(saved)} style={btn("#1e2330", "#60a5fa", "#2d3548")}>
                   Download .txt
                 </button>
-                <button
-                  onClick={saveToGist}
-                  disabled={gistLoading || (isDev && !pat.trim())}
-                  title={isDev && !pat.trim() ? "Enter a GitHub PAT below to save" : undefined}
-                  style={btn(gistLoading ? "#1e2330" : "#1e2330", (gistLoading || (isDev && !pat.trim())) ? "#475569" : "#a78bfa", "#2d3548")}
-                >
-                  {gistLoading ? "Saving…" : "Save to Gist"}
-                </button>
-              </div>
-            </div>
-
-            {isDev && (
-              <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
-                <input
-                  type="password"
-                  placeholder="GitHub PAT (ghp_…) — for Gist saving"
-                  value={pat}
-                  onChange={(e) => setPat(e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: "5px 10px",
-                    background: "#1a1f2e",
-                    border: `1px solid ${pat.trim() ? "#2d4a3e" : "#2d3548"}`,
-                    borderRadius: 5,
-                    color: "#e2e8f0",
-                    fontSize: 12,
-                    outline: "none",
-                    fontFamily: "monospace",
-                  }}
-                />
-                {pat && (
-                  <button onClick={() => setPat("")} style={btn("#1e2330", "#475569", "#2d3548")}>
-                    Clear
+                {!isDev && (
+                  <button
+                    onClick={syncToRepo}
+                    disabled={syncLoading}
+                    style={btn("#1e2330", syncLoading ? "#475569" : syncStatus === "synced" ? "#4ade80" : "#a78bfa", "#2d3548")}
+                  >
+                    {syncLoading ? "Syncing…" : syncStatus === "synced" ? "✓ Synced" : "Sync to GitHub"}
                   </button>
                 )}
               </div>
-            )}
+            </div>
 
-            {gistUrl && (
-              <div style={{ background: "#162320", border: "1px solid #2d4a3e", borderRadius: 6, padding: "10px 14px", marginBottom: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 12, color: "#4ade80" }}>✓ Saved!</span>
-                <a href={gistUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "#60a5fa", wordBreak: "break-all" }}>
-                  {gistUrl}
-                </a>
-                <button onClick={copyGistUrl} style={btn("#1e2330", gistCopied ? "#86efac" : "#94a3b8", "#2d3548")}>
-                  {gistCopied ? "Copied!" : "Copy URL"}
-                </button>
-              </div>
-            )}
-
-            {gistError && (
+            {syncStatus === "error" && syncError && (
               <div style={{ background: "#2a1515", border: "1px solid #4a2d2d", borderRadius: 6, padding: "8px 14px", marginBottom: 12 }}>
-                <span style={{ fontSize: 12, color: "#f87171" }}>Gist error: {gistError}</span>
+                <span style={{ fontSize: 12, color: "#f87171" }}>Sync error: {syncError}</span>
               </div>
             )}
 
