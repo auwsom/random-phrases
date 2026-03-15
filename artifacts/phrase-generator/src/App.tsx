@@ -188,6 +188,7 @@ export default function App() {
   const [gistLoading, setGistLoading] = useState(false);
   const [gistError, setGistError] = useState<string | null>(null);
   const [gistCopied, setGistCopied] = useState(false);
+  const envPat = import.meta.env.VITE_GITHUB_PAT as string | undefined;
   const [pat, setPat] = useState(() => sessionStorage.getItem("gh-pat") ?? "");
 
   useEffect(() => {
@@ -244,14 +245,16 @@ export default function App() {
     setSaved((s) => s.filter((_, idx) => idx !== i));
   }
 
+  const activePat = envPat || pat.trim();
+
   async function saveToGist() {
-    if (saved.length === 0 || !pat.trim()) return;
+    if (saved.length === 0 || !activePat) return;
     setGistLoading(true);
     setGistError(null);
     setGistUrl(null);
     setGistCopied(false);
     try {
-      const url = await createGist(saved, pat.trim());
+      const url = await createGist(saved, activePat);
       setGistUrl(url);
     } catch (e) {
       const msg = e instanceof Error && e.message.includes("403")
@@ -429,39 +432,41 @@ export default function App() {
                 </button>
                 <button
                   onClick={saveToGist}
-                  disabled={gistLoading || !pat.trim()}
-                  title={!pat.trim() ? "Enter a GitHub PAT below to save" : undefined}
-                  style={btn(gistLoading ? "#1e2330" : "#1e2330", (gistLoading || !pat.trim()) ? "#475569" : "#a78bfa", "#2d3548")}
+                  disabled={gistLoading || !activePat}
+                  title={!activePat ? "Enter a GitHub PAT below to save" : undefined}
+                  style={btn(gistLoading ? "#1e2330" : "#1e2330", (gistLoading || !activePat) ? "#475569" : "#a78bfa", "#2d3548")}
                 >
                   {gistLoading ? "Saving…" : "Save to Gist"}
                 </button>
               </div>
             </div>
 
-            <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
-              <input
-                type="password"
-                placeholder="GitHub PAT (ghp_…) — for Gist saving"
-                value={pat}
-                onChange={(e) => setPat(e.target.value)}
-                style={{
-                  flex: 1,
-                  padding: "5px 10px",
-                  background: "#1a1f2e",
-                  border: `1px solid ${pat.trim() ? "#2d4a3e" : "#2d3548"}`,
-                  borderRadius: 5,
-                  color: "#e2e8f0",
-                  fontSize: 12,
-                  outline: "none",
-                  fontFamily: "monospace",
-                }}
-              />
-              {pat && (
-                <button onClick={() => setPat("")} style={btn("#1e2330", "#475569", "#2d3548")}>
-                  Clear
-                </button>
-              )}
-            </div>
+            {!envPat && (
+              <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="password"
+                  placeholder="GitHub PAT (ghp_…) — for Gist saving"
+                  value={pat}
+                  onChange={(e) => setPat(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: "5px 10px",
+                    background: "#1a1f2e",
+                    border: `1px solid ${pat.trim() ? "#2d4a3e" : "#2d3548"}`,
+                    borderRadius: 5,
+                    color: "#e2e8f0",
+                    fontSize: 12,
+                    outline: "none",
+                    fontFamily: "monospace",
+                  }}
+                />
+                {pat && (
+                  <button onClick={() => setPat("")} style={btn("#1e2330", "#475569", "#2d3548")}>
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
 
             {gistUrl && (
               <div style={{ background: "#162320", border: "1px solid #2d4a3e", borderRadius: 6, padding: "10px 14px", marginBottom: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>

@@ -1,0 +1,9 @@
+[build]
+  base    = "."
+  command = "pnpm --filter @workspace/phrase-generator run build"
+  publish = "artifacts/phrase-generator/dist/public"
+
+[build.environment]
+  NODE_VERSION = "20"
+  PNPM_VERSION = "9"
+  BASE_PATH     = "/"
