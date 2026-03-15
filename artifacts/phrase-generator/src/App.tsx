@@ -223,23 +223,27 @@ export default function App() {
 
   function savePhrase() {
     if (phraseStr && !saved.includes(phraseStr)) {
-      setSaved((s) => [...s, phraseStr]);
+      const next = [...saved, phraseStr];
+      setSaved(next);
+      syncToRepo(next);
     }
   }
 
   function removePhrase(i: number) {
-    setSaved((s) => s.filter((_, idx) => idx !== i));
+    const next = saved.filter((_, idx) => idx !== i);
+    setSaved(next);
+    syncToRepo(next);
   }
 
-  async function syncToRepo() {
-    if (isDev || saved.length === 0) return;
+  async function syncToRepo(phrases: string[] = saved) {
+    if (isDev || phrases.length === 0) return;
     setSyncLoading(true);
     setSyncError(null);
     try {
       const res = await fetch("/.netlify/functions/phrases-repo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phrases: saved, sha: repoSha }),
+        body: JSON.stringify({ phrases, sha: repoSha }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `Server error: ${res.status}`);
@@ -408,18 +412,15 @@ export default function App() {
                 Saved ({saved.length})
               </p>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                {!isDev && syncLoading && (
+                  <span style={{ fontSize: 11, color: "#a78bfa" }}>Syncing…</span>
+                )}
+                {!isDev && syncStatus === "synced" && (
+                  <span style={{ fontSize: 11, color: "#4ade80" }}>✓ Synced</span>
+                )}
                 <button onClick={() => downloadFile(saved)} style={btn("#1e2330", "#60a5fa", "#2d3548")}>
                   Download .txt
                 </button>
-                {!isDev && (
-                  <button
-                    onClick={syncToRepo}
-                    disabled={syncLoading}
-                    style={btn("#1e2330", syncLoading ? "#475569" : syncStatus === "synced" ? "#4ade80" : "#a78bfa", "#2d3548")}
-                  >
-                    {syncLoading ? "Syncing…" : syncStatus === "synced" ? "✓ Synced" : "Sync to GitHub"}
-                  </button>
-                )}
               </div>
             </div>
 
